@@ -41,10 +41,10 @@ class Flag:
 
         By default, converts to str
     attr_name : Optional[str], optional
-        [description], by default None
+        Attribute name in the namespace. If no attribute name is given, defaults to the first flag name.
     default : Optional[Any], optional
-        A default argument for a flag., by default None
-    requires_arg : bool, optional
+        A default argument for a flag, by default None
+    required : bool, optional
         Whether the flag requires an argument, by default False
     is_bool_flag : bool, optional
         Whether the flag should be marked as a boolean flag, by default False
@@ -57,10 +57,10 @@ class Flag:
         Raised when a registration error occurs
     """
 
-    __slots__ = ('names', 'help', 'converter', 'attr_name', 'default', 'requires_arg', 'is_bool_flag')
+    __slots__ = ('names', 'help', 'converter', 'attr_name', 'default', 'required', 'is_bool_flag')
 
     def __init__(self, *names, help_doc: Optional[str] = None, converter: Any = str, attr_name: Optional[str] = None,
-                 default: Optional[Any] = None, requires_arg: bool = False, is_bool_flag: bool = False):
+                 default: Optional[Any] = None, required: bool = False, is_bool_flag: bool = False):
         for name in names:
             if name[0] != "-":
                 raise NotImplementedError("A flag name must start with \"-\"")
@@ -69,13 +69,16 @@ class Flag:
         self.converter = converter
         attr_name = attr_name if attr_name is not None else names[0]
         self.attr_name = attr_name.strip("-").replace("-", "_")
+        if self.attr_name == "rest":
+            raise FlagError("\"rest\" is a reserved attribute name.")
+
         self.default = default
-        self.requires_arg = requires_arg
+        self.required = required
 
         if self.default and is_bool_flag:
             raise FlagError("Boolean flags cannot have a default")
 
-        if self.requires_arg and is_bool_flag:
+        if self.required and is_bool_flag:
             raise FlagError("Boolean flags cannot require an argument")
 
         self.is_bool_flag = is_bool_flag
@@ -139,7 +142,10 @@ class Parser:
     async def convert_flag_type(self, flag: Flag, ctx: commands.Context, argument: Optional[str], passed_flag: str):
         converter = flag.converter
         if argument is None or argument.strip() == "":
-            raise MissingRequiredFlagArgument(passed_flag)
+            if flag.default is None:
+                raise MissingRequiredFlagArgument(passed_flag)
+            else:
+                argument = flag.default
 
         argument = argument.strip()
 
@@ -191,6 +197,8 @@ class Parser:
         for flag in flags:
             if flag.is_bool_flag is True:
                 ns[flag.attr_name] = False
+            else:
+                ns[flag.attr_name] = flag.default  # More and likely it's probably None...
         return ns
 
     async def parse_args(self, ctx):
@@ -198,7 +206,6 @@ class Parser:
         view.skip_ws()
         ns = self._prepare_namespace()
         rest = []
-        # Get first word...
         while True:
             word = view.get_quoted_word()
             if word is None:
@@ -229,8 +236,11 @@ class Parser:
                 rest.append(word)
                 continue
 
-        if self.consume_rest:
-            ns['rest'] = ''.join(rest) or None
+        for flag in self.get_all_unique_flags():
+            if ns[flag.attr_name] is None and flag.required is True:
+                raise MissingRequiredFlagArgument(flag.names[0])
+
+        ns['rest'] = ''.join(rest) or None if self.consume_rest is True else None
 
         return Namespace(**ns)
 

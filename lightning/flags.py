@@ -59,13 +59,13 @@ class Flag:
 
     __slots__ = ('names', 'help', 'converter', 'attr_name', 'default', 'required', 'is_bool_flag')
 
-    def __init__(self, *names, help_doc: Optional[str] = None, converter: Any = str, attr_name: Optional[str] = None,
+    def __init__(self, *names, help: Optional[str] = None, converter: Any = str, attr_name: Optional[str] = None,
                  default: Optional[Any] = None, required: bool = False, is_bool_flag: bool = False):
         for name in names:
             if name[0] != "-":
                 raise NotImplementedError("A flag name must start with \"-\"")
         self.names = names
-        self.help = help_doc
+        self.help = help
         self.converter = converter
         attr_name = attr_name if attr_name is not None else names[0]
         self.attr_name = attr_name.strip("-").replace("-", "_")

@@ -57,6 +57,8 @@ class Flag:
         Raised when a registration error occurs
     """
 
+    __slots__ = ('names', 'help', 'converter', 'attr_name', 'default', 'requires_arg', 'is_bool_flag')
+
     def __init__(self, *names, help_doc: Optional[str] = None, converter: Any = str, attr_name: Optional[str] = None,
                  default: Optional[Any] = None, requires_arg: bool = False, is_bool_flag: bool = False):
         for name in names:
@@ -65,7 +67,8 @@ class Flag:
         self.names = names
         self.help = help_doc
         self.converter = converter
-        self.attr_name = attr_name if attr_name is not None else names[0]
+        attr_name = attr_name if attr_name is not None else names[0]
+        self.attr_name = attr_name.strip("-").replace("-", "_")
         self.default = default
         self.requires_arg = requires_arg
 
@@ -94,6 +97,18 @@ def add_flag(*names, **kwargs):
         funct.__lightning_argparser__.add_flag(Flag(*names, **kwargs))
         return func
     return deco
+
+
+class Namespace:
+    def __init__(self, **kwargs):
+        for kwarg in kwargs:
+            setattr(self, kwarg, kwargs[kwarg])
+
+    def __contains__(self, key):
+        return key in self.__dict__
+
+    def __repr__(self):
+        return "<Namespace {}>".format(' '.join(f'{name}={value}' for name, value in list(self.__dict__.items())))
 
 
 class Parser:
@@ -170,10 +185,18 @@ class Parser:
 
             raise commands.BadArgument(f'Converting to "{name}" failed for flag "{passed_flag}".') from exc
 
+    def _prepare_namespace(self) -> dict:
+        ns = {}
+        flags = self.get_all_unique_flags()
+        for flag in flags:
+            if flag.is_bool_flag is True:
+                ns[flag.attr_name] = False
+        return ns
+
     async def parse_args(self, ctx):
-        view = ctx.view
+        view = StringView(ctx.view.read_rest())
         view.skip_ws()
-        current = {}
+        ns = self._prepare_namespace()
         rest = []
         # Get first word...
         while True:
@@ -197,32 +220,26 @@ class Parser:
                     continue
 
                 if flag.is_bool_flag is True:
-                    current[flag.attr_name] = True
+                    ns[flag.attr_name] = True
                     continue
 
                 next_arg = view.get_quoted_word()
-                current[flag.attr_name] = await self.convert_flag_type(flag, ctx, next_arg, stripped)
+                ns[flag.attr_name] = await self.convert_flag_type(flag, ctx, next_arg, stripped)
             else:
                 rest.append(word)
                 continue
 
-        # We need to mark all bool flags passed as False...
-        flags = self.get_all_unique_flags()
-        for flag in flags:
-            if flag.is_bool_flag is True and flag.attr_name not in current:
-                current[flag.attr_name] = False
-
         if self.consume_rest:
-            current['rest'] = ''.join(rest)
+            ns['rest'] = ''.join(rest) or None
 
-        return current
+        return Namespace(**ns)
 
 
 class FlagCommand(commands.Command):
     """Subclass of :class:commands.Command that implements flag parsing"""
     async def _parse_flag_args(self, ctx):
         args = await self.callback.__lightning_argparser__.parse_args(ctx)
-        ctx.kwargs.update(args)
+        ctx.kwargs.update(vars(args))
 
     async def _parse_arguments(self, ctx):
         ctx.args = [ctx] if self.cog is None else [self.cog, ctx]
@@ -272,8 +289,6 @@ class FlagCommand(commands.Command):
                     except RuntimeError:
                         break
             elif param.kind == param.VAR_KEYWORD:
-                # Construct a new view...
-                ctx.view = StringView(view.read_rest())
                 await self._parse_flag_args(ctx)
                 break
 

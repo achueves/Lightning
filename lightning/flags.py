@@ -95,9 +95,6 @@ def add_flag(*names, **kwargs):
         if not hasattr(funct, '__lightning_argparser__'):
             funct.__lightning_argparser__ = Parser()
 
-        should_raise = kwargs.pop('should_raise', True)
-        funct.__lightning_argparser__.raise_on_bad_flag = should_raise
-
         funct.__lightning_argparser__.add_flag(Flag(*names, **kwargs))
         return func
     return deco
@@ -248,6 +245,12 @@ class Parser:
 
 class FlagCommand(LightningCommand):
     """Subclass of :class:LightningCommand that implements flag parsing"""
+    def __init__(self, func, **kwargs):
+        super().__init__(func, **kwargs)
+        if hasattr(self.callback, '__lightning_argparser__'):
+            raise_bad_flag = kwargs.pop('raise_bad_flag', True)
+            self.callback.__lightning_argparser__.raise_on_bad_flag = raise_bad_flag
+
     async def _parse_flag_args(self, ctx):
         args = await self.callback.__lightning_argparser__.parse_args(ctx)
         ctx.kwargs.update(vars(args))

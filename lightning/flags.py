@@ -25,6 +25,7 @@ from discord.ext.commands.view import StringView
 
 from lightning.errors import (FlagError, FlagInputError,
                               MissingRequiredFlagArgument)
+from lightning.commands import LightningCommand
 
 
 class Flag:
@@ -245,8 +246,8 @@ class Parser:
         return Namespace(**ns)
 
 
-class FlagCommand(commands.Command):
-    """Subclass of :class:commands.Command that implements flag parsing"""
+class FlagCommand(LightningCommand):
+    """Subclass of :class:LightningCommand that implements flag parsing"""
     async def _parse_flag_args(self, ctx):
         args = await self.callback.__lightning_argparser__.parse_args(ctx)
         ctx.kwargs.update(vars(args))

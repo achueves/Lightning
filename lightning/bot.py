@@ -30,7 +30,7 @@ import aiohttp
 import asyncpg
 import discord
 import sentry_sdk
-from discord.ext import commands, flags, menus
+from discord.ext import commands, menus
 
 from lightning import cache, config, errors
 from lightning.context import LightningContext

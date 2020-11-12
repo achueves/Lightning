@@ -33,7 +33,7 @@ class FlagView(StringView):
         current = self.current
         if current is None:
             return None
-        
+
         result = [current]
 
         while not self.eof:
@@ -44,6 +44,7 @@ class FlagView(StringView):
             if current.isspace():
                 # word is over.
                 return ''.join(result)
+
             result.append(current)
 
 
@@ -225,7 +226,6 @@ class Parser:
         rest = []
         while not view.eof:
             word = view.get_word()
-            print(word)
             if word is None:
                 break
 
@@ -247,9 +247,8 @@ class Parser:
                 if flag.is_bool_flag is True:
                     ns[flag.attr_name] = True
                     continue
-
+                view.skip_ws()
                 next_arg = view.get_quoted_word()
-                print(next_arg)
                 ns[flag.attr_name] = await self.convert_flag_type(flag, ctx, next_arg, stripped)
             else:
                 rest.append(word)

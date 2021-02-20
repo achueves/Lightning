@@ -1,6 +1,6 @@
 """
 Lightning.py - A personal Discord bot
-Copyright (C) 2020 - LightSage
+Copyright (C) 2019-2021 LightSage
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published
@@ -14,9 +14,62 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+import inspect
+import functools
+
+import attr
 from discord.ext import commands
 
 from lightning import errors
+
+
+@attr.s(slots=True, auto_attribs=True)
+class Permissions:
+    bot_guild_permissions: list = []
+    bot_channel_permissions: list = []
+    user_guild_permissions: list = []
+    user_channel_permissions: list = []
+
+
+def permission_check(predicate):
+    def decorator(func):
+        def add_permissions():
+            callback = getattr(func, 'callback', func)
+            if not hasattr(callback, '__lightning_permissions__'):
+                callback.__lightning_permissions__ = Permissions()
+
+            permissions = callback.__lightning_permissions__
+
+            if hasattr(predicate, 'guild_permissions'):
+                permissions.user_guild_permissions.append(predicate.guild_permissions)
+            elif hasattr(predicate, 'bot_guild_permissions'):
+                permissions.bot_guild_permissions.append(predicate.bot_guild_permissions)
+            elif hasattr(predicate, 'channel_permissions'):
+                permissions.channel_permissions.append(predicate.user_channel_permissions)
+            return add_permissions
+
+        if isinstance(func, commands.Command):
+            func.checks.append(predicate)
+            add_permissions()
+        else:
+            if not hasattr(func, '__commands_checks__'):
+                func.__commands_checks__ = []
+
+            add_permissions()
+
+            func.__commands_checks__.append(predicate)
+
+        return func
+
+    if inspect.iscoroutinefunction(predicate):
+        decorator.predicate = predicate
+    else:
+        @functools.wraps(predicate)
+        async def wrapper(ctx):
+            return predicate(ctx)
+        decorator.predicate = wrapper
+
+    return decorator
 
 
 def is_guild(guild_id):
@@ -70,7 +123,7 @@ def has_channel_permissions(**permissions):
     async def predicate(ctx):
         return check_channel_permissions(ctx, permissions)
     predicate.channel_permissions = list(permissions.keys())
-    return commands.check(predicate)
+    return permission_check(predicate)
 
 
 async def check_guild_permissions(ctx, perms, *, check=all):
@@ -91,7 +144,7 @@ def has_guild_permissions(**permissions):
             raise commands.MissingPermissions(permissions)
         return permcheck
     pred.guild_permissions = list(permissions.keys())
-    return commands.check(pred)
+    return permission_check(pred)
 
 
 def required_cog(cog_name):
@@ -101,3 +154,19 @@ def required_cog(cog_name):
             raise errors.CogNotAvailable(cog_name)
         return True
     return commands.check(predicate)
+
+
+def bot_has_guild_permissions(**permissions):
+    async def predicate(ctx):
+        if not ctx.guild:
+            return False
+
+        me = ctx.me.guild_permissions
+        perms: bool = all(getattr(me, name, None) == value for name, value in perms.items())
+
+        if perms is False:
+            raise commands.BotMissingPermissions(perms)
+
+        return perms
+    predicate.bot_guild_permissions = list(permissions.keys())
+    return permission_check(predicate)

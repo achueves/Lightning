@@ -14,6 +14,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+from importlib.metadata import version
 
 __all__ = ('__title__',
            '__version__',
@@ -21,6 +22,6 @@ __all__ = ('__title__',
            '__author__')
 
 __title__ = "Lightning"
-__version__ = "3.2.0-alpha"
+__version__ = version(__title__ + ".py")
 __license__ = "GNU Affero General Public License Version 3"
 __author__ = "LightSage"

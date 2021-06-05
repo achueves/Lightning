@@ -138,6 +138,14 @@ class InfractionSource(menus.KeysetPageSource):
 
         return embed
 
+EvidenceTypes = ["message",  # A jump_url wouldn't be useful b/c users.
+                 ""]
+EvidenceTypeConverters = {"message": commands.MessageConverter.convert}
+
+def convert_argument_from_evidence(evidence_type, ctx, argument):
+    converter = EvidenceTypeConverters[evidence_type]
+    return await converter(ctx, argument)
+
 
 class Infractions(LightningCog, required=['Mod']):
     """Infraction related commands"""
@@ -196,6 +204,30 @@ class Infractions(LightningCog, required=['Mod']):
             return
 
         await ctx.send(f"Edited {infraction_id}")
+
+    @infraction.command(level=CommandLevel.Mod)
+    @has_guild_permissions(manage_guild=True)
+    async def addevidence(self, ctx: LightningContext, infraction_id: int,
+                          evidence_type: typing.Literal[EvidenceTypes], evidence) -> None:
+        """Adds evidence to an infraction.
+        
+        To view evidence, use {prefix}infraction view"""
+        query = """SELECT extra
+                   FROM infractions
+                   WHERE guild_id=$1 AND id=$2;"""
+        data = await self.bot.pool.fetchval(query, ctx.guild.id, infraction_id)
+        if not data:
+            await ctx.send(f"An infraction with {infraction_id} doesn't exist!")
+            return
+
+        data = data.get("evidence", {}).get(evidence_type, [])
+        # Convert evidence depending on type...
+        data['evidence'][evidence_type] = evidence
+
+        query = """UPDATE infractions
+                   SET extra=$1
+                   WHERE guild_id=$2 AND id=$3;"""
+        await self.bot.pool.execute(query, data, ctx.guild.id, infraction_id)
 
     @infraction.command(level=CommandLevel.Admin)
     @has_guild_permissions(manage_guild=True)

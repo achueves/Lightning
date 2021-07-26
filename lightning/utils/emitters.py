@@ -1,5 +1,5 @@
 """
-Lightning.py - A personal Discord bot
+Lightning.py - A Discord bot
 Copyright (C) 2019-2021 LightSage
 
 This program is free software: you can redistribute it and/or modify
@@ -15,35 +15,42 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import asyncio
+from typing import NamedTuple, Optional
 
 import aiohttp
 import discord
+from discord.ext.tasks import Loop
+from discord.utils import MISSING
 
 
 class Emitter:
     """Base emitter"""
-    def __init__(self, *, loop: asyncio.AbstractEventLoop = None):
-        self.loop = loop or asyncio.get_event_loop()
-        self._queue = asyncio.Queue()
-        self._task = None
+    def __init__(self, *, loop: asyncio.AbstractEventLoop = None, task_name: Optional[str] = None, **kwargs):
+        self._queue = asyncio.Queue(loop=loop)
+        kwargs = {'seconds': 0, 'minutes': 0, 'hours': 0, 'time': MISSING, 'count': None}
+        self.task = Loop(self.emit_loop, reconnect=True, loop=loop, **kwargs)
+        self.task_name = task_name
 
     def start(self) -> None:
-        self._task = self.loop.create_task(self._run())
+        self.task.start()
 
     @property
     def closed(self):
         return self._task.cancelled() if self._task else True
 
     def close(self) -> None:
-        self._task.cancel()
+        self.task.cancel()
 
     def running(self) -> bool:
-        return not self.closed
+        return self.task.is_running
 
-    def get_task(self):
-        return self._task
+    # def get_task(self):
+    #    return self._task
 
-    async def _run(self):
+    async def emit_loop(self):
+        await self._emit()
+
+    async def _emit(self):
         raise NotImplementedError
 
 
@@ -57,8 +64,8 @@ class WebhookEmbedEmitter(Emitter):
     async def put(self, embed: discord.Embed) -> None:
         await self._queue.put(embed)
 
-    async def _run(self):
-        while not self.closed:
+    async def _emit(self):
+        while self.task.is_running:
             embed = await self._queue.get()
             embeds = [embed]
             await asyncio.sleep(5)
@@ -70,34 +77,38 @@ class WebhookEmbedEmitter(Emitter):
             await self.webhook.send(embeds=embeds)
 
 
+class Stats(NamedTuple):
+    sent: int
+    pending: int
+
+
 class TextChannelEmitter(Emitter):
     """An emitter designed for a text channel"""
     def __init__(self, channel: discord.TextChannel, **kwargs):
-        super().__init__(**kwargs)
+        super().__init__(task_name=f"textchannel-emitter-{channel.id}", **kwargs)
         self.channel = channel
+        self._stats = (0,)
 
-    def start(self) -> None:
-        super().start()
-        self._task.set_name(f"textchannel-emitter-{self.channel.id}")
+    def get_stats(self) -> Stats:
+        return Stats(self._stats[0], self._queue.qsize())
 
-    async def put(self, *args, **kwargs):
-        coro = self.channel.send(*args, **kwargs)
-        await self._queue.put(coro)
+    async def put(self, content=None, **kwargs):
+        x = {'content': content, **kwargs}
+        await self._queue.put(x)
 
     async def send(self, *args, **kwargs):
         """Alias function for TextChannelEmitter.put"""
         await self.put(*args, **kwargs)
 
-    async def _run(self):
-        while not self.closed:
-            coro = await self._queue.get()
+    async def _emit(self):
+        while self.task.is_running:
+            msg = await self._queue.get()
 
             try:
-                await coro
+                await self.channel.send(**msg)
+                self._stats[0] += 1
             except discord.NotFound:
                 self.close()
-            except (asyncio.TimeoutError, aiohttp.ClientError, discord.HTTPException):
-                pass
 
             # Rough estimate to wait before sending again without hitting ratelimits.
             # We may need to rethink this...

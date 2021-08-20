@@ -159,3 +159,28 @@ class UpdateableMenu(MenuLikeView):
 
         if wait:
             await self.wait()
+
+
+# classes for easy-to-use submenus!
+class SelectMenu(BaseView):
+    def __init__(self, *options, max_options: int = 1, exitable: bool = True, **kwargs):
+        select = discord.ui.Select(max_values=max_options)
+
+        for option in options:
+            if isinstance(option, discord.ui.Select):
+                select.append_option(option)
+            else:
+                select.add_option(label=option)
+
+        select.callback = self.select_callback
+        self.add_item(select)
+
+        if exitable:
+            self.add_item(StopButton(label="Exit"))
+
+        # Expose this as a just in case
+        self._select = select
+
+    async def select_callback(self, select: discord.ui.Select, interaction: discord.Interaction) -> None:
+        self.stop()
+        self.values = select.values

@@ -113,22 +113,18 @@ class MenuLikeView(BaseView):
             await self.wait()
 
     @contextlib.asynccontextmanager
-    async def sub_menu(self, *items, view):
+    async def sub_menu(self, view):
         """Async context manager for submenus.
 
         Parameters
         ----------
-        *items
-            Items to attach to the view
         view
             A view. Ideally, this should be SelectSubMenu or ButtonSubMenu.
         """
         try:
             view = view
-            # Assign some attributes
+            # Assign ctx to view
             view.ctx = self.ctx
-            for item in items:
-                view.add_item(item)
             yield view
         finally:
             pass
@@ -180,22 +176,18 @@ class UpdateableMenu(MenuLikeView):
         ...
 
     @contextlib.asynccontextmanager
-    async def sub_menu(self, *items, view):
+    async def sub_menu(self, view):
         """Async context manager for submenus.
 
         Parameters
         ----------
-        *items
-            Items to attach to the view
         view
             A view. Ideally, this should be SelectSubMenu or ButtonSubMenu.
         """
         try:
             view = view
-            # Assign some attributes
+            # Assign ctx to view
             view.ctx = self.ctx
-            for item in items:
-                view.add_item(item)
             yield view
         finally:
             await self.update()

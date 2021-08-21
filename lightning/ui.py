@@ -15,17 +15,23 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import asyncio
-from inspect import isawaitable as ins_isawaitable
+import contextlib
+import logging
+from inspect import isawaitable
 
 import discord
+import sentry_sdk
 
 __all__ = ("BaseView",
            "MenuLikeView",
-           "ExitableMenu")
+           "ExitableMenu",
+           "UpdateableMenu",
+           "SelectSubMenu")
+log = logging.getLogger(__name__)
 
 
 class BaseView(discord.ui.View):
-    """A view that adds cleanup to it"""
+    """A view that adds cleanup and error logging to it"""
     async def cleanup(self):
         """Coroutine that cleans up something (like database connections, whatever).
 
@@ -39,6 +45,15 @@ class BaseView(discord.ui.View):
         loop = asyncio.get_event_loop()
         loop.create_task(self.cleanup())
         super().stop()
+
+    async def on_error(self, error, item, interaction):
+        with sentry_sdk.push_scope() as scope:
+            # lines = traceback.format_exception(type(error), error, error.__traceback__, chain=False)
+            # traceback_text = ''.join(lines)
+            scope.set_extra("view", self)
+            scope.set_extra("item", item)
+            scope.set_extra("interaction", interaction)
+            log.exception(f"An exception occurred during {self} with {item}", exc_info=error)
 
 
 class MenuLikeView(BaseView):
@@ -88,7 +103,7 @@ class MenuLikeView(BaseView):
         dest = channel or ctx.channel
 
         fmt = self.format_initial_message(ctx)
-        if ins_isawaitable(fmt):
+        if isawaitable(fmt):
             fmt = await fmt
 
         kwargs = self._assume_message_kwargs(fmt)
@@ -96,6 +111,27 @@ class MenuLikeView(BaseView):
 
         if wait:
             await self.wait()
+
+    @contextlib.asynccontextmanager
+    async def sub_menu(self, *items, view):
+        """Async context manager for submenus.
+
+        Parameters
+        ----------
+        *items
+            Items to attach to the view
+        view
+            A view. Ideally, this should be SelectSubMenu or ButtonSubMenu.
+        """
+        try:
+            view = view
+            # Assign some attributes
+            view.ctx = self.ctx
+            for item in items:
+                view.add_item(item)
+            yield view
+        finally:
+            pass
 
     async def cleanup(self) -> None:
         # This is first for obvious reasons
@@ -134,7 +170,7 @@ class UpdateableMenu(MenuLikeView):
         await self.update_components()
 
         fmt = self.format_initial_message(self.ctx)
-        if ins_isawaitable(fmt):
+        if isawaitable(fmt):
             fmt = await fmt
 
         kwargs = self._assume_message_kwargs(fmt)
@@ -142,6 +178,27 @@ class UpdateableMenu(MenuLikeView):
 
     async def update_components(self) -> None:
         ...
+
+    @contextlib.asynccontextmanager
+    async def sub_menu(self, *items, view):
+        """Async context manager for submenus.
+
+        Parameters
+        ----------
+        *items
+            Items to attach to the view
+        view
+            A view. Ideally, this should be SelectSubMenu or ButtonSubMenu.
+        """
+        try:
+            view = view
+            # Assign some attributes
+            view.ctx = self.ctx
+            for item in items:
+                view.add_item(item)
+            yield view
+        finally:
+            await self.update()
 
     async def start(self, ctx, *, channel=None, wait=True) -> None:
         self.ctx = ctx
@@ -151,7 +208,7 @@ class UpdateableMenu(MenuLikeView):
         await self.update_components()
 
         fmt = self.format_initial_message(ctx)
-        if ins_isawaitable(fmt):
+        if isawaitable(fmt):
             fmt = await fmt
 
         kwargs = self._assume_message_kwargs(fmt)
@@ -162,7 +219,7 @@ class UpdateableMenu(MenuLikeView):
 
 
 # classes for easy-to-use submenus!
-class SelectMenu(BaseView):
+class SelectSubMenu(BaseView):
     def __init__(self, *options, max_options: int = 1, exitable: bool = True, **kwargs):
         select = discord.ui.Select(max_values=max_options)
 

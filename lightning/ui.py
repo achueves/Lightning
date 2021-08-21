@@ -112,9 +112,9 @@ class MenuLikeView(BaseView):
         if wait:
             await self.wait()
 
-    @contextlib.asynccontextmanager
-    async def sub_menu(self, view):
-        """Async context manager for submenus.
+    @contextlib.contextmanager
+    def sub_menu(self, view):
+        """Context manager for submenus.
 
         Parameters
         ----------
@@ -212,6 +212,11 @@ class UpdateableMenu(MenuLikeView):
 
 # classes for easy-to-use submenus!
 class SelectSubMenu(BaseView):
+    """
+    A view designed to work for submenus.
+
+    To retrieve the values after the view has stopped, use the values attribute.
+    """
     def __init__(self, *options, max_options: int = 1, exitable: bool = True, **kwargs):
         select = discord.ui.Select(max_values=max_options)
 

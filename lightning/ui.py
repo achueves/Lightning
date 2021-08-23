@@ -236,3 +236,29 @@ class SelectSubMenu(BaseView):
     async def select_callback(self, select: discord.ui.Select, interaction: discord.Interaction) -> None:
         self.stop()
         self.values = select.values
+
+
+class _ButtonSM(discord.ui.Button):
+    async def callback(self, interaction: discord.Interaction) -> None:
+        self.view.stop()
+        self.result = self.label
+
+
+class ButtonSubMenu(BaseView):
+    """
+    A view designed to work for submenus.
+
+    To retrieve the button that was pressed, use the result attribute.
+
+    Parameters
+    ----------
+    *choices : tuple(str)
+        Choices to choose from.
+    style : discord.ButtonStyle
+        A style to use for the buttons. Defaults to discord.ButtonStyle.primary.
+    """
+    def __init__(self, *choices, style: discord.ButtonStyle = discord.ButtonStyle.primary):
+        self.result = None
+
+        for x in choices:
+            self.add_item(_ButtonSM(label=x, style=style))

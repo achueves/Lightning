@@ -121,10 +121,9 @@ class MenuLikeView(BaseView):
         view
             A view. Ideally, this should be SelectSubMenu or ButtonSubMenu.
         """
+        # There might need to be more involvement, but this is simple atm.
+        view.ctx = self.ctx
         try:
-            view = view
-            # Assign ctx to view
-            view.ctx = self.ctx
             yield view
         finally:
             pass
@@ -184,10 +183,9 @@ class UpdateableMenu(MenuLikeView):
         view
             A view. Ideally, this should be SelectSubMenu or ButtonSubMenu.
         """
+        # There might need to be more involvement, but this is simple atm.
+        view.ctx = self.ctx
         try:
-            view = view
-            # Assign ctx to view
-            view.ctx = self.ctx
             yield view
         finally:
             await self.update()

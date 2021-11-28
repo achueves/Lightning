@@ -4,6 +4,7 @@ from typing import Optional, Union
 import discord
 from tomlkit import loads as toml_loads
 from tomlkit.items import Integer, String, Table
+from tomlkit.toml_document import TOMLDocument
 
 # This might be an enum instead
 VALID_AUTOMOD_TYPES = ["message-spam", "mass-mentions"]
@@ -44,6 +45,10 @@ class BaseConfig:
         self.punishment = AutomodPunishmentConfig(punishment_cfg)
 
 
+class MassMentionsConfig(BaseConfig):
+    ...
+
+
 class MessageSpamConfig(BaseConfig):
     def __init__(self, type: str, per, sec, punishment_config: Optional[dict]) -> None:
         super().__init__(type, per, punishment_config)
@@ -68,7 +73,7 @@ def parse_config(key: str, value):
         raise ConfigurationError("Punishment should be an integer, not a subtable.")
 
     if key == "mass-mentions":
-        return BaseConfig(key, per, punishment)
+        return MassMentionsConfig(key, per, punishment)
 
     try:
         return MessageSpamConfig(key, per, sec, punishment)
@@ -76,17 +81,19 @@ def parse_config(key: str, value):
         raise ConfigurationError(e)
 
 
-async def from_file(file: discord.Attachment):
-    file = await file.read()
-    x = toml_loads(file)
+def read_file(file: TOMLDocument):
     cfgs = []
-
-    for key, value in list(x.items()):
+    for key, value in list(file.items()):
         if key == "automod":
             if type(value) != Table:
                 raise ConfigurationError(f"Expected a subtable, got {value.__class__.__name__} instead.")
 
             for key, value in list(value.items()):
                 cfgs.append(parse_config(key, value))
-
     return cfgs
+
+
+async def from_attachment(file: discord.Attachment):
+    file = await file.read()
+    x = toml_loads(file)
+    return read_file(x)

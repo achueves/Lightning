@@ -15,10 +15,11 @@ class ConfigurationError(Exception):
 
 
 class AutomodPunishmentEnum(IntEnum):
-    WARN = 1
-    MUTE = 2
-    KICK = 3
-    BAN = 4
+    DELETE = 1
+    WARN = 2
+    MUTE = 3
+    KICK = 4
+    BAN = 5
 
 
 def convert_to_automod_punishment(value: str):

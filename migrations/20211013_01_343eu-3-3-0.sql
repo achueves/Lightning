@@ -4,5 +4,5 @@
 CREATE TABLE IF NOT EXISTS automod
 (
     guild_id BIGINT NOT NULL REFERENCES guilds (id) ON DELETE CASCADE PRIMARY KEY,
-    config TEXT,
+    config TEXT
 );

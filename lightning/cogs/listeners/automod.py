@@ -24,7 +24,8 @@ from tomlkit import loads as toml_loads
 from lightning import CommandLevel, LightningCog, cache
 from lightning.models import PartialGuild
 from lightning.utils import modlogformats
-from lightning.utils.automod_parser import (AutomodPunishmentEnum,
+from lightning.utils.automod_parser import (AutomodPunishmentConfig,
+                                            AutomodPunishmentEnum,
                                             MassMentionsConfig,
                                             MessageSpamConfig, read_file)
 
@@ -45,7 +46,7 @@ class MessageConfigBase:
     """A class to make interacting with a message spam config easier..."""
     def __init__(self, rate, seconds, punishment_config, bucket_type) -> None:
         self.cooldown_bucket = CooldownMapping(Cooldown(rate, seconds), bucket_type)
-        self.punishment = punishment_config
+        self.punishment: AutomodPunishmentConfig = punishment_config
 
     @classmethod
     def from_record(cls, record: MessageSpamConfig, bucket_type):
@@ -55,6 +56,10 @@ class MessageConfigBase:
         b = self.cooldown_bucket.get_bucket(message)
         ratelimited = b.update_rate_limit(message.created_at.timestamp())
         return True if ratelimited else False
+
+    def reset_bucket(self, message: discord.Message):
+        b = self.cooldown_bucket.get_bucket(message)
+        b.reset()
 
 
 class AutoMod(LightningCog, required=["Mod"]):
@@ -151,6 +156,7 @@ class AutoMod(LightningCog, required=["Mod"]):
                 await meth(self, message)
 
         if record.message_spam and record.message_spam.update_bucket(message) is True:
+            record.message_spam.reset_bucket(message)  # Reset our bucket
             meth = self.punishments[record.message_spam.punishment.type]
             await meth(self, message)
 

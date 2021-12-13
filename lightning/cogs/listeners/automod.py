@@ -43,9 +43,9 @@ class AutomodConfig:
 
 class MessageConfigBase:
     """A class to make interacting with a message spam config easier..."""
-    def __init__(self, rate, seconds, punishment_options, bucket_type) -> None:
+    def __init__(self, rate, seconds, punishment_config, bucket_type) -> None:
         self.cooldown_bucket = CooldownMapping(Cooldown(rate, seconds), bucket_type)
-        self.punishment_options = punishment_options
+        self.punishment = punishment_config
 
     @classmethod
     def from_record(cls, record: MessageSpamConfig, bucket_type):
@@ -67,14 +67,7 @@ class AutoMod(LightningCog, required=["Mod"]):
         return AutomodConfig(record) if record else None
 
     async def add_punishment_role(self, guild_id: int, user_id: int, role_id: int, *, connection=None) -> str:
-        query = """INSERT INTO roles (guild_id, user_id, punishment_roles)
-                   VALUES ($1, $2, $3::bigint[])
-                   ON CONFLICT (guild_id, user_id)
-                   DO UPDATE SET
-                       punishment_roles =
-                   ARRAY(SELECT DISTINCT * FROM unnest(COALESCE(roles.punishment_roles, '{}') || $3::bigint[]));"""
-        connection = connection or self.bot.pool
-        return await connection.execute(query, guild_id, user_id, [role_id])
+        return await self.bot.get_cog("Mod").add_punishment_role(guild_id, user_id, role_id, connection=connection)
 
     async def remove_punishment_role(self, guild_id: int, user_id: int, role_id: int, *, connection=None) -> None:
         return await self.bot.get_cog("Mod").remove_punishment_role(guild_id, user_id, role_id, connection=connection)

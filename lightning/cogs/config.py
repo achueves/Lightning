@@ -531,6 +531,8 @@ class Configuration(LightningCog):
         await self.bot.pool.execute(query, ctx.guild.id, str(await attachment.read(), "UTF-8"))
 
         await ctx.send("Configured automod according to your settings.")
+        c = self.bot.get_cog("AutoMod")
+        await c.get_automod_config.invalidate(ctx.guild.id)
 
     # COMMAND OVERRIDES
 

@@ -25,8 +25,7 @@ from lightning import CommandLevel, LightningCog, cache
 from lightning.models import PartialGuild
 from lightning.utils import modlogformats
 from lightning.utils.automod_parser import (AutomodPunishmentConfig,
-                                            AutomodPunishmentEnum,
-                                            MassMentionsConfig,
+                                            AutomodPunishmentEnum, BaseConfig,
                                             MessageSpamConfig, read_file)
 
 
@@ -34,11 +33,11 @@ class AutomodConfig:
     def __init__(self, record) -> None:
         records = read_file(toml_loads(record))
         self.message_spam: Optional[MessageConfigBase] = None
-        self.mass_mentions: Optional[MassMentionsConfig] = None
+        self.mass_mentions: Optional[BaseConfig] = None
         for record in records:
-            if isinstance(record, MessageSpamConfig):
+            if record.type == "message-spam":
                 self.message_spam = MessageConfigBase.from_record(record, BucketType.member)
-            if isinstance(record, MassMentionsConfig):
+            if record.type == "mass-mentions":
                 self.mass_mentions = record
 
 

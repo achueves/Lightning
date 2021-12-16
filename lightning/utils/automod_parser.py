@@ -38,10 +38,6 @@ class BaseConfig(BaseModel):
     punishment: AutomodPunishmentConfig
 
 
-class MassMentionsConfig(BaseConfig):
-    ...
-
-
 class MessageSpamConfig(BaseConfig):
     seconds: int
 
@@ -65,7 +61,7 @@ def parse_config(key: str, value):
         value['punishment'] = {"type": value['punishment']}
 
     if key == "mass-mentions":
-        return MassMentionsConfig(type=key, **value)
+        return BaseConfig(type=key, **value)
 
     try:
         return MessageSpamConfig(type=key, **value)

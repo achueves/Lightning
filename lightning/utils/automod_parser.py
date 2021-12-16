@@ -27,18 +27,18 @@ def convert_to_automod_punishment(value: str):
         raise ConfigurationError("Invalid automod punishment supplied")
 
 
-class AutomodPunishmentConfig(BaseModel):
+class AutomodPunishmentModel(BaseModel):
     type: AutomodPunishmentEnum
     seconds: Optional[Union[float, int]]
 
 
-class BaseConfig(BaseModel):
+class BaseTableModel(BaseModel):
     type: Literal["message-spam", "mass-mentions"]
     per: int
-    punishment: AutomodPunishmentConfig
+    punishment: AutomodPunishmentModel
 
 
-class MessageSpamConfig(BaseConfig):
+class MessageSpamModel(BaseTableModel):
     seconds: int
 
     @validator('punishment')
@@ -61,10 +61,10 @@ def parse_config(key: str, value):
         value['punishment'] = {"type": value['punishment']}
 
     if key == "mass-mentions":
-        return BaseConfig(type=key, **value)
+        return BaseTableModel(type=key, **value)
 
     try:
-        return MessageSpamConfig(type=key, **value)
+        return MessageSpamModel(type=key, **value)
     except Exception as e:
         raise ConfigurationError(e)
 

@@ -24,16 +24,17 @@ from tomlkit import loads as toml_loads
 from lightning import CommandLevel, LightningCog, cache
 from lightning.models import PartialGuild
 from lightning.utils import modlogformats
-from lightning.utils.automod_parser import (AutomodPunishmentConfig,
-                                            AutomodPunishmentEnum, BaseConfig,
-                                            MessageSpamConfig, read_file)
+from lightning.utils.automod_parser import (AutomodPunishmentEnum,
+                                            AutomodPunishmentModel,
+                                            BaseTableModel, MessageSpamModel,
+                                            read_file)
 
 
 class AutomodConfig:
     def __init__(self, record) -> None:
         records = read_file(toml_loads(record))
         self.message_spam: Optional[MessageConfigBase] = None
-        self.mass_mentions: Optional[BaseConfig] = None
+        self.mass_mentions: Optional[BaseTableModel] = None
         for record in records:
             if record.type == "message-spam":
                 self.message_spam = MessageConfigBase.from_record(record, BucketType.member)
@@ -45,10 +46,10 @@ class MessageConfigBase:
     """A class to make interacting with a message spam config easier..."""
     def __init__(self, rate, seconds, punishment_config, bucket_type) -> None:
         self.cooldown_bucket = CooldownMapping(Cooldown(rate, seconds), bucket_type)
-        self.punishment: AutomodPunishmentConfig = punishment_config
+        self.punishment: AutomodPunishmentModel = punishment_config
 
     @classmethod
-    def from_record(cls, record: MessageSpamConfig, bucket_type):
+    def from_record(cls, record: MessageSpamModel, bucket_type):
         return cls(record.per, record.seconds, record.punishment, bucket_type)
 
     def update_bucket(self, message: discord.Message):

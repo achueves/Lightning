@@ -1,13 +1,11 @@
 from enum import IntEnum
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 import discord
+from pydantic import BaseModel, validator
 from tomlkit import loads as toml_loads
 from tomlkit.items import Integer, String, Table
 from tomlkit.toml_document import TOMLDocument
-
-# This might be an enum instead
-VALID_AUTOMOD_TYPES = ["message-spam", "mass-mentions"]
 
 
 class ConfigurationError(Exception):
@@ -29,21 +27,15 @@ def convert_to_automod_punishment(value: str):
         raise ConfigurationError("Invalid automod punishment supplied")
 
 
-class AutomodPunishmentConfig:
-    def __init__(self, type) -> None:
-        self.type = convert_to_automod_punishment(type)
-        # self.max: int = ...
-        self.seconds: Optional[Union[float, int]] = ...
+class AutomodPunishmentConfig(BaseModel):
+    type: AutomodPunishmentEnum
+    seconds: Optional[Union[float, int]]
 
 
-class BaseConfig:
-    def __init__(self, type, per, punishment_cfg) -> None:
-        if type not in VALID_AUTOMOD_TYPES:
-            raise ConfigurationError("Invalid automod type")
-
-        self.type = type
-        self.per = per
-        self.punishment = AutomodPunishmentConfig(punishment_cfg)
+class BaseConfig(BaseModel):
+    type: Literal["message-spam", "mass-mentions"]
+    per: int
+    punishment: AutomodPunishmentConfig
 
 
 class MassMentionsConfig(BaseConfig):
@@ -51,33 +43,31 @@ class MassMentionsConfig(BaseConfig):
 
 
 class MessageSpamConfig(BaseConfig):
-    def __init__(self, type: str, per, sec, punishment_config: Optional[dict]) -> None:
-        super().__init__(type, per, punishment_config)
-        self.seconds = sec
+    seconds: int
+
+    @validator('punishment')
+    def validate_punishment(cls, value):
+        if value.type is AutomodPunishmentEnum.DELETE:
+            raise ConfigurationError("DELETE punishment is not a valid type")
 
 
 def parse_config(key: str, value):
-    if key not in VALID_AUTOMOD_TYPES:
-        raise ConfigurationError("Invalid automod type")
-
-    per = value.get("per", None)
-    sec = value.get("seconds", None)
-    if per is None and sec is None:
-        raise ConfigurationError("Missing one of \"per\" or \"seconds\".")
-
     # Other configuration parameters may need to be validated...
 
     punishment = value.get("punishment", None)
 
-    if punishment and type(punishment) not in (String, Integer):  # at some point we'll support String
+    if punishment and type(punishment) not in (Integer, String):  # at some point we'll support String
         # Optional link to configuration docs
-        raise ConfigurationError("Punishment should be an integer, not a subtable.")
+        raise ConfigurationError("Punishment should be a subtable.")
+
+    if punishment:
+        value['punishment'] = {"type": value['punishment']}
 
     if key == "mass-mentions":
-        return MassMentionsConfig(key, per, punishment)
+        return MassMentionsConfig(type=key, **value)
 
     try:
-        return MessageSpamConfig(key, per, sec, punishment)
+        return MessageSpamConfig(type=key, **value)
     except Exception as e:
         raise ConfigurationError(e)
 

@@ -49,6 +49,7 @@ class MessageSpamConfig(BaseConfig):
     def validate_punishment(cls, value):
         if value.type is AutomodPunishmentEnum.DELETE:
             raise ConfigurationError("DELETE punishment is not a valid type")
+        return value
 
 
 def parse_config(key: str, value):

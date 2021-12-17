@@ -1,10 +1,10 @@
 from enum import IntEnum
-from typing import Literal, Optional, Union
+from typing import Literal, Optional
 
 import discord
 from pydantic import BaseModel, validator
 from tomlkit import loads as toml_loads
-from tomlkit.items import Integer, String, Table
+from tomlkit.items import Table
 from tomlkit.toml_document import TOMLDocument
 
 
@@ -29,7 +29,7 @@ def convert_to_automod_punishment(value: str):
 
 class AutomodPunishmentModel(BaseModel):
     type: AutomodPunishmentEnum
-    seconds: Optional[Union[float, int]]
+    seconds: Optional[float]
 
 
 class BaseTableModel(BaseModel):
@@ -39,7 +39,7 @@ class BaseTableModel(BaseModel):
 
 
 class MessageSpamModel(BaseTableModel):
-    seconds: int
+    seconds: float
 
     @validator('punishment')
     def validate_punishment(cls, value):
@@ -53,12 +53,9 @@ def parse_config(key: str, value):
 
     punishment = value.get("punishment", None)
 
-    if punishment and type(punishment) not in (Integer, String):  # at some point we'll support String
+    if punishment and type(punishment) is not Table:  # at some point we'll support String
         # Optional link to configuration docs
         raise ConfigurationError("Punishment should be a subtable.")
-
-    if punishment:
-        value['punishment'] = {"type": value['punishment']}
 
     if key == "mass-mentions":
         return BaseTableModel(type=key, **value)

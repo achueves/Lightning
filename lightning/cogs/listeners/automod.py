@@ -50,7 +50,7 @@ class MessageConfigBase:
 
     @classmethod
     def from_record(cls, record: MessageSpamModel, bucket_type):
-        return cls(record.per, record.seconds, record.punishment, bucket_type)
+        return cls(record.count, record.seconds, record.punishment, bucket_type)
 
     def update_bucket(self, message: discord.Message):
         b = self.cooldown_bucket.get_bucket(message)
@@ -151,7 +151,7 @@ class AutoMod(LightningCog, required=["Mod"]):
             return
 
         if record.mass_mentions:
-            if len(message.mentions) >= record.mass_mentions.per:
+            if len(message.mentions) >= record.mass_mentions.count:
                 meth = self.punishments[record.mass_mentions.punishment.type]
                 await meth(self, message)
 

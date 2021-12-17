@@ -34,7 +34,7 @@ class AutomodPunishmentModel(BaseModel):
 
 class BaseTableModel(BaseModel):
     type: Literal["message-spam", "mass-mentions"]
-    per: int
+    count: int
     punishment: AutomodPunishmentModel
 
 

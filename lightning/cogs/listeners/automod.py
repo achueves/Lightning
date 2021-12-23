@@ -52,12 +52,12 @@ class MessageConfigBase:
     def from_model(cls, record: MessageSpamModel, bucket_type):
         return cls(record.count, record.seconds, record.punishment, bucket_type)
 
-    def update_bucket(self, message: discord.Message):
+    def update_bucket(self, message: discord.Message) -> bool:
         b = self.cooldown_bucket.get_bucket(message)
         ratelimited = b.update_rate_limit(message.created_at.timestamp())
         return bool(ratelimited)
 
-    def reset_bucket(self, message: discord.Message):
+    def reset_bucket(self, message: discord.Message) -> None:
         b = self.cooldown_bucket.get_bucket(message)
         b.reset()
 
@@ -84,7 +84,7 @@ class AutoMod(LightningCog, required=["Mod"]):
         c = self.bot.get_cog("Mod")
         return await c.log_manual_action(guild, target, moderator, action, timestamp=timestamp, reason=reason, **kwargs)
 
-    async def is_member_whitelisted(self, message) -> bool:
+    async def is_member_whitelisted(self, message: discord.Message) -> bool:
         """Check that tells whether a member is exempt from automod or not"""
         # TODO: Check against a generic set of moderator permissions.
         record = await self.bot.get_guild_bot_config(message.guild.id)
@@ -114,11 +114,9 @@ class AutoMod(LightningCog, required=["Mod"]):
                                      reason="Member triggered automod")
 
     async def _ban_punishment(self, message: discord.Message):
-        target = message.author
-
         reason = modlogformats.action_format(self.bot.user, reason="Automod triggered")
-        await target.ban(reason=reason)
-        await self.log_manual_action(message.guild, target, self.bot.user, "BAN", reason=reason)
+        await message.author.ban(reason=reason)
+        await self.log_manual_action(message.guild, message.author, self.bot.user, "BAN", reason=reason)
 
     async def _delete_punishment(self, message: discord.Message):
         try:

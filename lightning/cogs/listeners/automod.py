@@ -37,7 +37,7 @@ class AutomodConfig:
         self.mass_mentions: Optional[BaseTableModel] = None
         for record in records:
             if record.type == "message-spam":
-                self.message_spam = MessageConfigBase.from_record(record, BucketType.member)
+                self.message_spam = MessageConfigBase.from_model(record, BucketType.member)
             if record.type == "mass-mentions":
                 self.mass_mentions = record
 
@@ -49,13 +49,13 @@ class MessageConfigBase:
         self.punishment: AutomodPunishmentModel = punishment_config
 
     @classmethod
-    def from_record(cls, record: MessageSpamModel, bucket_type):
+    def from_model(cls, record: MessageSpamModel, bucket_type):
         return cls(record.count, record.seconds, record.punishment, bucket_type)
 
     def update_bucket(self, message: discord.Message):
         b = self.cooldown_bucket.get_bucket(message)
         ratelimited = b.update_rate_limit(message.created_at.timestamp())
-        return True if ratelimited else False
+        return bool(ratelimited)
 
     def reset_bucket(self, message: discord.Message):
         b = self.cooldown_bucket.get_bucket(message)
@@ -100,10 +100,7 @@ class AutoMod(LightningCog, required=["Mod"]):
         if level == CommandLevel.Blocked:  # Blocked to commands, not ignored by automod
             return False
 
-        if level.value >= CommandLevel.Trusted.value:
-            return True
-        else:
-            return False
+        return level.value >= CommandLevel.Trusted.value
 
     # These only require one param, "message", because it contains all the information we want.
     async def _warn_punishment(self, message: discord.Message):
@@ -126,7 +123,7 @@ class AutoMod(LightningCog, required=["Mod"]):
     async def _delete_punishment(self, message: discord.Message):
         try:
             await message.delete()
-        except (discord.Forbidden, discord.HTTPException):
+        except discord.HTTPException:
             pass
 
     punishments = {AutomodPunishmentEnum.WARN: _warn_punishment,
@@ -150,10 +147,9 @@ class AutoMod(LightningCog, required=["Mod"]):
         if not record:
             return
 
-        if record.mass_mentions:
-            if len(message.mentions) >= record.mass_mentions.count:
-                meth = self.punishments[record.mass_mentions.punishment.type]
-                await meth(self, message)
+        if record.mass_mentions and len(message.mentions) >= record.mass_mentions.count:
+            meth = self.punishments[record.mass_mentions.punishment.type]
+            await meth(self, message)
 
         if record.message_spam and record.message_spam.update_bucket(message) is True:
             record.message_spam.reset_bucket(message)  # Reset our bucket
